@@ -25,8 +25,6 @@ ChartJS.register(
 );
 
 interface LoginTrendData {
-  dayOfWeek: number;
-  dayName: string;
   hour: number;
   loginCount: number;
 }
@@ -51,7 +49,8 @@ const LoginTrendsChart: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>('2023-12-29');
+  const [dateToApply, setDateToApply] = useState<string>('2023-12-29');
 
   const fetchLoginTrends = useCallback(async (dateToFetch?: string) => {
     setLoading(true);
@@ -64,33 +63,28 @@ const LoginTrendsChart: React.FC = () => {
       const rawData: LoginTrendData[] = response.data.data;
       const defaultDateHeader = response.headers['x-default-date'] as string;
 
-      if (!selectedDate && defaultDateHeader) {
+      if (defaultDateHeader && dateToFetch === undefined) {
         setSelectedDate(defaultDateHeader);
+        setDateToApply(defaultDateHeader);
       }
 
-      const processedData: { [dayName: string]: number[] } = {};
-      const uniqueDays = new Set<string>();
+      const processedData: number[] = Array(24).fill(0);
 
       rawData.forEach(item => {
-        if (!processedData[item.dayName]) {
-          processedData[item.dayName] = Array(24).fill(0);
-        }
         if (item.hour >= 0 && item.hour < 24) {
-          processedData[item.dayName][item.hour] = item.loginCount;
+          processedData[item.hour] = item.loginCount;
         }
-        uniqueDays.add(item.dayName);
       });
 
-    const datasets = Array.from(uniqueDays)
-      .map(dayName => ({
-        label: dayName,
-        data: processedData[dayName],
+      const datasets = [{
+        label: `Logins on ${dateToApply || 'Selected Date'}`,
+        data: processedData,
         borderColor: '#008000',
         backgroundColor: '#00800040',
         tension: 0.3,
         pointRadius: 3,
         pointHoverRadius: 5,
-      }));
+      }];
 
       setChartData({
         labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
@@ -98,19 +92,19 @@ const LoginTrendsChart: React.FC = () => {
       });
 
     } catch (err: any) {
-      setError("Failed to fetch login trends: " + err.message);
-      console.error(err);
+        setError("Failed to fetch trends login: " + err.message);
+        console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [dateToApply]);
 
   useEffect(() => {
-    fetchLoginTrends();
-  }, [fetchLoginTrends]);
+    fetchLoginTrends(dateToApply);
+  }, [fetchLoginTrends, dateToApply]);
 
   const handleApplyFilter = () => {
-    fetchLoginTrends(selectedDate);
+    setDateToApply(selectedDate);
   };
 
   const options = {
@@ -119,7 +113,7 @@ const LoginTrendsChart: React.FC = () => {
     plugins: {
       title: {
         display: true,
-        text: (chartData.datasets.length === 0 || chartData.datasets.every(ds => ds.data.every(d => d === 0))) ? 'No data' : `Customer Login Trends for ${selectedDate || 'Selected Date'}`,
+        text: (chartData.datasets.length === 0 || chartData.datasets.every(ds => ds.data.every(d => d === 0))) ? 'No data' : `Customer Login Trends for ${dateToApply || 'Selected Date'}`,
       },
       tooltip: {
         mode: 'index' as const,
